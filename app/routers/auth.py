@@ -256,14 +256,33 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         db.commit()
     except Exception as e:
         db.rollback()
+        # Clean up Firebase account so the user is not orphaned
         try:
             from firebase_admin import auth as fa
             fa.delete_user(uid)
         except Exception:
             pass
+
+        err = str(e).lower()
+
+        if "ix_users_email" in err or ("unique" in err and "email" in err):
+            raise HTTPException(
+                status_code=409,
+                detail={"success": False, "message": "An account with this email already exists. Please log in instead.", "code": "EMAIL_EXISTS"}
+            )
+        if "student_number" in err and "unique" in err:
+            raise HTTPException(
+                status_code=409,
+                detail={"success": False, "message": "A student with this student number already exists.", "code": "STUDENT_NUMBER_EXISTS"}
+            )
+        if "staff_id" in err and "unique" in err:
+            raise HTTPException(
+                status_code=409,
+                detail={"success": False, "message": "An educator with this staff ID already exists.", "code": "STAFF_ID_EXISTS"}
+            )
         raise HTTPException(
             status_code=500,
-            detail={"success": False, "message": f"Failed to save user: {str(e)}", "code": "DB_ERROR"}
+            detail={"success": False, "message": "Something went wrong while saving your account. Please try again.", "code": "DB_ERROR"}
         )
 
     try:
