@@ -33,6 +33,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
+        envVars:
+          - key: PYTHON_VERSION
+            value: 3.12.10
+
 databases:
   - name: academic-db
     databaseName: academic
