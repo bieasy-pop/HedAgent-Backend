@@ -335,13 +335,16 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user.is_verified = firebase_user.get("email_verified", user.is_verified)
     if payload.onesignal_player_id:
         user.onesignal_player_id = payload.onesignal_player_id
+
+    # Store the latest token in DB so /user/token always reflects the most recent login
+    user.last_token = firebase_user["id_token"]
     db.commit()
 
     user = _load_user(db, user.id)
     return {
         "success": True,
         "message": "Login successful.",
-        "token": firebase_user["id_token"],
+        "token": firebase_user["id_token"],        # fresh token — store this in Flutter
         "refresh_token": firebase_user["refresh_token"],
         "user": _build_user_data(user),
     }
@@ -435,3 +438,206 @@ def me(current_user: dict = Depends(get_current_user), db: Session = Depends(get
         "message": "User retrieved successfully.",
         "user": _build_user_data(user),
     }
+
+
+@router.post(
+    "/send-verification",
+    responses={
+        200: {"description": "Verification email sent"},
+        400: {"model": ErrorResponse, "description": "Email already verified"},
+        401: {"model": ErrorResponse, "description": "Invalid token"},
+    },
+    summary="Send email verification link",
+    description="""
+Triggers Firebase to send a verification email to the authenticated user.
+
+Call this right after registration so the user can verify their email.
+Flutter should call this once on the post-registration screen, then poll
+`GET /api/auth/verify-email` every few seconds until `is_verified` is true.
+
+Requires `Authorization: Bearer <token>` header.
+""",
+)
+def send_verification_email(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from firebase_admin import auth as fa
+
+    # Check current status first
+    firebase_record = fa.get_user(current_user["uid"])
+
+    if firebase_record.email_verified:
+        # Already verified — sync DB and return early
+        user = db.query(User).filter(User.id == current_user["uid"]).first()
+        if user:
+            user.is_verified = True
+            db.commit()
+        return {
+            "success": True,
+            "message": "Your email is already verified. No email sent.",
+            "is_verified": True,
+            "email": firebase_record.email,
+        }
+
+    # Ask Firebase to send the verification email via REST API
+    # We need the user's ID token for this — re-sign in isn't possible here
+    # so we use the Admin SDK to generate an email verification link instead
+    try:
+        link = fa.generate_email_verification_link(firebase_record.email)
+        # In production you would send this via your own email service (SendGrid etc.)
+        # For MVP, Firebase sends it automatically when you use the REST API below
+    except Exception:
+        pass
+
+    # Use REST API to send verification email (requires the user's current ID token)
+    # Flutter must pass a fresh token so Firebase can send on their behalf
+    with httpx.Client(timeout=10.0) as client:
+        res = client.post(
+            f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={settings.FIREBASE_WEB_API_KEY}",
+            json={
+                "requestType": "VERIFY_EMAIL",
+                "idToken": current_user.get("raw_token", ""),
+            }
+        )
+    data = res.json()
+
+    if "error" in data:
+        code = data["error"].get("message", "UNKNOWN")
+        if "TOO_MANY_ATTEMPTS" in code:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "success": False,
+                    "message": "Too many verification emails sent. Please wait a few minutes before trying again, or check your spam folder for a previous email.",
+                    "code": "TOO_MANY_ATTEMPTS",
+                }
+            )
+        if "INVALID_ID_TOKEN" in code or "TOKEN_EXPIRED" in code:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "success": False,
+                    "message": "Your session has expired. Please log in again and retry.",
+                    "code": "TOKEN_EXPIRED",
+                }
+            )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "message": "Could not send verification email. Please try again later.",
+                "code": code,
+            }
+        )
+
+    return {
+        "success": True,
+        "message": f"Verification email sent to {firebase_record.email}. Please check your inbox and spam folder.",
+        "is_verified": False,
+        "email": firebase_record.email,
+    }
+
+
+@router.get(
+    "/user/token",
+    response_model=UserResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Missing or invalid token"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
+    summary="Get user by token",
+    description="""
+Returns the full profile of the user identified by the Bearer token.
+
+The token is the Firebase ID token returned from `POST /api/auth/login`.
+It refreshes on every login so Flutter should always use the latest token
+from the most recent login response.
+
+Requires `Authorization: Bearer <token>` header.
+""",
+)
+def get_user_by_token(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = _load_user(db, current_user["uid"])
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "message": "No user found for this token. Please log in again.",
+                "code": "USER_NOT_FOUND",
+            }
+        )
+
+    # Sync latest email verification status from Firebase on every token call
+    try:
+        from firebase_admin import auth as fa
+        firebase_record = fa.get_user(current_user["uid"])
+        if user.is_verified != firebase_record.email_verified:
+            user.is_verified = firebase_record.email_verified
+            db.commit()
+            user = _load_user(db, current_user["uid"])
+    except Exception:
+        pass  # non-fatal — return whatever is in DB
+
+    return {
+        "success": True,
+        "message": "User retrieved successfully.",
+        "user": _build_user_data(user),
+    }
+
+@router.get(
+    "/user/{user_id}",
+    response_model=UserResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Missing or invalid token"},
+        403: {"model": ErrorResponse, "description": "Access denied"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
+    summary="Get any user by ID",
+    description="""
+Fetches the full profile of any user by their ID.
+
+**Access rules:**
+- Students can only fetch their own profile.
+- Educators and admins can fetch any user's profile.
+
+Requires `Authorization: Bearer <token>` header.
+""",
+)
+def get_user_by_id(
+    user_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Access control — students can only see themselves
+    if current_user["role"] == "student" and current_user["uid"] != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "success": False,
+                "message": "You are not allowed to view other users' profiles.",
+                "code": "ACCESS_DENIED",
+            }
+        )
+
+    user = _load_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "message": f"No user found with ID: {user_id}",
+                "code": "USER_NOT_FOUND",
+            }
+        )
+
+    return {
+        "success": True,
+        "message": "User retrieved successfully.",
+        "user": _build_user_data(user),
+    }
+

@@ -1,4 +1,5 @@
 .env
+.env.production
 *.pyc
 __pycache__/
 .venv/
@@ -8,3 +9,6 @@ dist/
 build/
 .DS_Store
 serviceAccountKey.json
+serviceAccountKey.dev.json
+serviceAccountKey.prod.json
+fix_render_db.py
