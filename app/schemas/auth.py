@@ -75,6 +75,34 @@ class LoginRequest(BaseModel):
     onesignal_player_id: Optional[str] = None
 
 
+class UserAdminUpdate(BaseModel):
+    """Fields an admin may edit on any user. `id`, `email`, and `role` are
+    excluded — email/id are tied to the Firebase auth record, and role
+    changes require creating/removing the linked Student/Educator profile
+    row, which is handled elsewhere."""
+    is_verified: Optional[bool] = None
+    is_active: Optional[bool] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    other_name: Optional[str] = None
+    university_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    gender: Optional[Gender] = None
+    date_of_birth: Optional[date] = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Name fields cannot be blank")
+        return v.strip().title() if v else v
+
+    @field_validator("other_name", mode="before")
+    @classmethod
+    def clean_other_name(cls, v):
+        return v.strip().title() if v else v
+
+
 # ── Profile sub-responses ─────────────────────────────────────────────────────
 
 class StudentProfileResponse(BaseModel):

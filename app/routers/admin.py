@@ -10,6 +10,8 @@ from app.models.educator import Educator
 from app.models.educator_approval import EducatorApproval, ApprovalStatus
 from app.middleware.auth_middleware import require_role
 from app.services.onesignal_service import send_push
+from app.schemas.auth import UserAdminUpdate
+from app.routers.auth import _load_user, _build_user_data
 
 router = APIRouter()
 
@@ -138,4 +140,45 @@ def all_users(
             "is_verified": u.is_verified,
             "created_at": u.created_at.isoformat() if u.created_at else None,
         } for u in users],
+    }
+
+
+@router.patch("/users/{user_id}", summary="Update a user's fields (e.g. is_verified, is_active)")
+def update_user(
+    user_id: str,
+    payload: UserAdminUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin")),
+):
+    """
+    Admin-only. Updates editable fields on any user — is_verified, is_active,
+    name, university, phone, gender, date_of_birth. `role`, `email`, and `id`
+    are not editable here (role changes need the linked profile row handled;
+    email/id are tied to the Firebase auth record).
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={"success": False, "message": f"No user found with ID: {user_id}", "code": "USER_NOT_FOUND"},
+        )
+
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(
+            status_code=422,
+            detail={"success": False, "message": "No fields provided to update.", "code": "NO_FIELDS"},
+        )
+
+    for field, value in updates.items():
+        setattr(user, field, value)
+
+    db.commit()
+    db.refresh(user)
+
+    user = _load_user(db, user.id)
+    return {
+        "success": True,
+        "message": "User updated successfully.",
+        "user": _build_user_data(user),
     }
