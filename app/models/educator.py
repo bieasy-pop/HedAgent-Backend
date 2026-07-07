@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime
+from sqlalchemy import Column, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -15,8 +15,11 @@ class Educator(Base):
     department = Column(String, nullable=True)
     designation = Column(String, nullable=True)
     specialization = Column(String, nullable=True)
+    is_approved = Column(Boolean, default=False)     # set true after super admin approval
 
     user = relationship("User", back_populates="educator_profile")
+    courses = relationship("EducatorCourse", back_populates="educator", lazy="dynamic")
+    student_relationships = relationship("EducatorStudent", back_populates="educator", lazy="dynamic")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -22,13 +22,17 @@ class Student(Base):
     attendance_rate = Column(Float, nullable=True)
 
     risk_score = Column(Float, default=0.0)
-    risk_label = Column(String, default="normal")
+    risk_label = Column(String, default="unclassified")   # at_risk/high_potential/average/on_track/critical
     ai_summary = Column(String, nullable=True)
 
     meta = Column(JSON, default={})
 
     user = relationship("User", back_populates="student_profile")
     interventions = relationship("Intervention", back_populates="student", lazy="dynamic")
+    courses = relationship("StudentCourse", back_populates="student", lazy="dynamic")
+    educator_relationships = relationship("EducatorStudent", back_populates="student", lazy="dynamic")
+    ai_classifications = relationship("AIClassification", back_populates="student", lazy="dynamic")
+    reminders = relationship("Reminder", back_populates="student", lazy="dynamic")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
