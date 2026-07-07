@@ -240,7 +240,10 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         date_of_birth=payload.date_of_birth,
         role=payload.role,
         onesignal_player_id=payload.onesignal_player_id,
-        is_verified=False,
+        # TEMP: Firebase email verification is not currently sending emails,
+        # so new accounts are verified by default. Revert to False once
+        # verification emails are working again.
+        is_verified=True,
     )
     db.add(user)
 
@@ -293,7 +296,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user = _load_user(db, uid)
     return {
         "success": True,
-        "message": "Account created successfully. Please verify your email.",
+        "message": "Account created successfully.",
         "token": firebase_user["id_token"],
         "user": _build_user_data(user),
     }
@@ -331,8 +334,12 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             detail={"success": False, "message": "Your account has been deactivated.", "code": "ACCOUNT_INACTIVE"}
         )
 
-    # Refresh email verification status + device token
-    user.is_verified = firebase_user.get("email_verified", user.is_verified)
+    # Refresh email verification status + device token.
+    # TEMP: only ever upgrade to verified — Firebase isn't sending
+    # verification emails right now, so a real "not verified" status must
+    # not downgrade accounts that were auto-verified at registration.
+    if firebase_user.get("email_verified"):
+        user.is_verified = True
     if payload.onesignal_player_id:
         user.onesignal_player_id = payload.onesignal_player_id
 
@@ -384,10 +391,11 @@ def check_email_verified(
     firebase_record = fa.get_user(current_user["uid"])
     is_verified = firebase_record.email_verified
 
-    # Sync to DB
+    # Sync to DB. TEMP: only ever upgrade to verified (see register()/login()
+    # for why) — Firebase isn't sending verification emails right now.
     user = db.query(User).filter(User.id == current_user["uid"]).first()
-    if user:
-        user.is_verified = is_verified
+    if user and is_verified and not user.is_verified:
+        user.is_verified = True
         db.commit()
 
     if is_verified:
@@ -572,12 +580,13 @@ def get_user_by_token(
             }
         )
 
-    # Sync latest email verification status from Firebase on every token call
+    # Sync latest email verification status from Firebase on every token call.
+    # TEMP: only ever upgrade to verified (see register()/login() for why).
     try:
         from firebase_admin import auth as fa
         firebase_record = fa.get_user(current_user["uid"])
-        if user.is_verified != firebase_record.email_verified:
-            user.is_verified = firebase_record.email_verified
+        if firebase_record.email_verified and not user.is_verified:
+            user.is_verified = True
             db.commit()
             user = _load_user(db, current_user["uid"])
     except Exception:
