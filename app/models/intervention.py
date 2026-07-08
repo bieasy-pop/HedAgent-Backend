@@ -25,8 +25,9 @@ class Intervention(Base):
 
     id = Column(String, primary_key=True)
     student_id = Column(String, ForeignKey("students.id"), nullable=False, index=True)
-    raised_by = Column(String, ForeignKey("users.id"), nullable=False)     # educator/admin UID
+    raised_by = Column(String, ForeignKey("users.id"), nullable=False)     # educator/admin UID, or the student themself for goal-driven interventions
     assigned_to = Column(String, ForeignKey("users.id"), nullable=True)
+    goal_id = Column(String, ForeignKey("goals.id"), nullable=True, index=True)   # set when AI-generated from a student goal
 
     type = Column(Enum(InterventionType), nullable=False)
     status = Column(Enum(InterventionStatus), default=InterventionStatus.open)
@@ -43,3 +44,4 @@ class Intervention(Base):
     student = relationship("Student", back_populates="interventions")
     raiser = relationship("User", foreign_keys=[raised_by])
     assignee = relationship("User", foreign_keys=[assigned_to])
+    goal = relationship("Goal", back_populates="interventions")

@@ -236,3 +236,68 @@ async def educator_chat(conversation: list[dict]) -> str:
     if "error" in data:
         raise Exception(data["error"].get("message", "Gemini API error"))
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+async def recommend_academic_interventions(student_data: dict, goal_description: str) -> dict:
+    """
+    Given a student's self-described goal, recommends concrete academic-success
+    interventions toward it. Strictly scoped to academics — goals unrelated to
+    coursework/study/academic performance come back with out_of_scope=True and
+    no interventions, rather than the model inventing an academic angle for them.
+    """
+    prompt = f"""You are an academic success advisor for a university student support system.
+
+A student has described a personal goal. Recommend concrete, actionable academic
+interventions — study strategies, tutoring, course-specific help, time management for
+coursework, exam preparation, academic resources — that help them work toward this goal.
+
+STRICT SCOPE RULE: Only recommend activities related to academic success and study aid
+(coursework, study habits, tutoring, exam prep, academic resources, course/major planning).
+If the goal is NOT about academics (e.g. social life, fitness, finances, romantic
+relationships, career goals unrelated to studies), do NOT invent an academic angle for it.
+Instead set "out_of_scope" to true, explain briefly why in "summary", and leave
+"interventions" as an empty list.
+
+Student profile:
+- GPA: {student_data.get('gpa', 'not recorded')}
+- Attendance rate: {round((student_data.get('attendance_rate') or 0) * 100, 1)}%
+- Level: {student_data.get('level', 'unknown')}
+- Department: {student_data.get('department', 'unknown')}
+- Risk label: {student_data.get('risk_label', 'unclassified')}
+
+Student's stated goal:
+"{goal_description}"
+
+Respond ONLY with valid JSON. No markdown, no backticks. Use this exact structure:
+{{
+  "out_of_scope": false,
+  "summary": "2-3 sentence framing of how these interventions support the student's goal",
+  "interventions": [
+    {{"title": "Short action title", "description": "1-3 sentences of what to do and why it helps"}}
+  ]
+}}
+
+Recommend at most 4 interventions. Be specific and practical, not generic."""
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            GEMINI_URL,
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800},
+            }
+        )
+    data = response.json()
+    if "error" in data:
+        raise Exception(data["error"].get("message", "Gemini API error"))
+
+    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+    raw_text = raw_text.strip().replace("```json", "").replace("```", "").strip()
+    result = json.loads(raw_text)
+
+    out_of_scope = bool(result.get("out_of_scope", False))
+    return {
+        "out_of_scope": out_of_scope,
+        "summary": result.get("summary", ""),
+        "interventions": [] if out_of_scope else result.get("interventions", []),
+    }

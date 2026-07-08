@@ -7,7 +7,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.config import settings
 from app.routers import auth, students, interventions, ai, notifications
-from app.routers import courses, classification, analytics, reminders, admin
+from app.routers import courses, classification, analytics, reminders, admin, goals
 
 ENV_LABEL = "🔧 DEV" if settings.is_development else "🚀 PROD"
 
@@ -83,6 +83,7 @@ app.include_router(classification.router, prefix="/api/classification",  tags=["
 app.include_router(analytics.router,      prefix="/api/analytics",       tags=["Analytics"])
 app.include_router(reminders.router,      prefix="/api/reminders",       tags=["Reminders"])
 app.include_router(admin.router,          prefix="/api/admin",           tags=["Admin"])
+app.include_router(goals.router,          prefix="/api/goals",           tags=["Goals"])
 
 
 @app.get("/", tags=["Health"])

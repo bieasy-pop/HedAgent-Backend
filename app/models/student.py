@@ -33,6 +33,7 @@ class Student(Base):
     educator_relationships = relationship("EducatorStudent", back_populates="student", lazy="dynamic")
     ai_classifications = relationship("AIClassification", back_populates="student", lazy="dynamic")
     reminders = relationship("Reminder", back_populates="student", lazy="dynamic")
+    goals = relationship("Goal", back_populates="student", lazy="dynamic")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

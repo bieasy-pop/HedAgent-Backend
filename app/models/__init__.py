@@ -8,9 +8,11 @@ from app.models.relationship import EducatorStudent
 from app.models.ai_classification import AIClassification
 from app.models.reminder import Reminder
 from app.models.educator_approval import EducatorApproval
+from app.models.goal import Goal
 
 __all__ = [
     "User", "Student", "Educator", "Intervention", "NotificationLog",
     "Course", "StudentCourse", "EducatorCourse",
     "EducatorStudent", "AIClassification", "Reminder", "EducatorApproval",
+    "Goal",
 ]
