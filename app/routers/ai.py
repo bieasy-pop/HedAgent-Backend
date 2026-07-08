@@ -41,7 +41,7 @@ async def get_student_insight(
     student_data = {
         "gpa": student.gpa,
         "attendance_rate": student.attendance_rate,
-        "grade_level": student.grade_level,
+        "level": student.level,
         "department": student.department,
         "risk_score": student.risk_score,
         "risk_label": student.risk_label,
@@ -76,7 +76,7 @@ async def chat(
         "content": (
             f"Context: I am an educator asking about student {payload.student_id}. "
             f"Their profile: GPA={student.gpa}, attendance={student.attendance_rate}, "
-            f"grade={student.grade_level}, risk={student.risk_label}."
+            f"level={student.level}, risk={student.risk_label}."
         ),
     }
 

@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class StudentUpdate(BaseModel):
-    grade_level: Optional[str] = None
+    level: Optional[str] = None
     department: Optional[str] = None
     gpa: Optional[float] = None
     attendance_rate: Optional[float] = None
@@ -15,7 +15,7 @@ class StudentResponse(BaseModel):
     id: str
     user_id: str
     student_number: Optional[str]
-    grade_level: Optional[str]
+    level: Optional[str]
     department: Optional[str]
     gpa: Optional[float]
     attendance_rate: Optional[float]

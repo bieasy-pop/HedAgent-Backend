@@ -64,7 +64,7 @@ async def update_student(
     student_data = {
         "gpa": student.gpa,
         "attendance_rate": student.attendance_rate,
-        "grade_level": student.grade_level,
+        "level": student.level,
         "department": student.department,
     }
     student.ai_summary = await generate_student_insight(student_data)

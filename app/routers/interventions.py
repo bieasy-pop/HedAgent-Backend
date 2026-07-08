@@ -47,7 +47,7 @@ async def create_intervention(
     student_data = {
         "gpa": student.gpa,
         "attendance_rate": student.attendance_rate,
-        "grade_level": student.grade_level,
+        "level": student.level,
         "risk_score": student.risk_score,
     }
 
