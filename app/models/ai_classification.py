@@ -18,6 +18,7 @@ class AIClassification(Base):
     risk_label = Column(String, nullable=False)        # at_risk / high_potential / average / on_track / critical
     risk_score = Column(Float, nullable=False)          # 0.0 - 1.0
     gpa_at_time = Column(Float, nullable=True)
+    gpa_grade = Column(String, nullable=True)          # Best Result / Good Result / Fair Result / Average Result / Poor Result
     attendance_at_time = Column(Float, nullable=True)
 
     # AI-generated content

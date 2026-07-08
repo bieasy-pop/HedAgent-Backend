@@ -105,6 +105,7 @@ async def classify(
         "classification": {
             "risk_label": result["risk_label"],
             "risk_score": result["risk_score"],
+            "gpa_grade": result.get("gpa_grade"),
             "summary": result["summary"],
             "remarks": result["remarks"],
             "recommendations": result["recommendations"],
@@ -144,6 +145,7 @@ def classification_history(
             "risk_label": h.risk_label,
             "risk_score": h.risk_score,
             "gpa_at_time": h.gpa_at_time,
+            "gpa_grade": h.gpa_grade,
             "summary": h.summary,
             "remarks": h.remarks,
             "recommendations": h.recommendations,
