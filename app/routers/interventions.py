@@ -10,7 +10,7 @@ from app.models.student import Student
 from app.models.user import User
 from app.schemas.intervention import InterventionCreate, InterventionUpdate, InterventionResponse
 from app.middleware.auth_middleware import get_current_user, require_role
-from app.services.openai_service import generate_intervention_plan
+from app.services.gemini_service import generate_intervention_plan
 from app.services.cloudinary_service import upload_file
 from app.services.onesignal_service import send_push
 

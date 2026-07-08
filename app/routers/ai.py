@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.student import Student
 from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
-from app.services.openai_service import generate_student_insight, educator_chat
+from app.services.gemini_service import generate_student_insight, educator_chat
 
 router = APIRouter()
 

@@ -6,7 +6,7 @@ from app.models.student import Student
 from app.models.user import User
 from app.schemas.student import StudentUpdate, StudentResponse
 from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
-from app.services.openai_service import generate_student_insight
+from app.services.gemini_service import generate_student_insight
 from app.services.cloudinary_service import upload_file
 
 router = APIRouter()
