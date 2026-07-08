@@ -8,7 +8,7 @@ from app.models.relationship import EducatorStudent
 from app.models.intervention import Intervention
 from app.models.ai_classification import AIClassification
 from app.models.course import StudentCourse
-from app.middleware.auth_middleware import get_current_user, require_role
+from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
 from app.services.gemini_service import generate_analytics_summary
 
 router = APIRouter()
@@ -18,11 +18,12 @@ RISK_ORDER = ["critical", "at_risk", "average", "on_track", "high_potential", "u
 
 @router.get("/student/{student_id}", summary="Student analytics dashboard")
 async def student_analytics(
-    student_id: str,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Full analytics for a single student — GPA trend, classification history, course performance."""
+    """Full analytics for a single student — GPA trend, classification history, course performance.
+    Students can view their own (pass "me" as student_id); educators/admins use the real Student.id."""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail={"success": False, "message": "Student not found.", "code": "NOT_FOUND"})

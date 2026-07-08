@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.reminder import Reminder, ReminderType
 from app.models.student import Student
 from app.models.user import User
-from app.middleware.auth_middleware import get_current_user, require_role
+from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
 from app.services.onesignal_service import send_push
 
 router = APIRouter()
@@ -69,7 +69,7 @@ async def create_reminder(
 
 @router.get("/student/{student_id}", summary="Get reminders for a student")
 def student_reminders(
-    student_id: str,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):

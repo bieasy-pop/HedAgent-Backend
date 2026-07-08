@@ -7,7 +7,7 @@ from app.models.educator import Educator
 from app.models.relationship import EducatorStudent
 from app.models.ai_classification import AIClassification
 from app.models.user import User
-from app.middleware.auth_middleware import get_current_user, require_role
+from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
 from app.services.gemini_service import classify_student
 from app.services.onesignal_service import send_push
 
@@ -78,14 +78,14 @@ async def _run_classification(student: Student, db: Session, triggered_by: str =
 
 @router.post("/classify/{student_id}", summary="Run AI classification for a student")
 async def classify(
-    student_id: str,
     background_tasks: BackgroundTasks,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Runs Gemini AI classification for a student.
-    Students can classify themselves; educators can classify their students.
+    Students can classify themselves (pass "me" as student_id); educators can classify their students.
     Returns the classification result immediately.
     Educator alerts are dispatched in the background.
     """
@@ -105,7 +105,6 @@ async def classify(
         "classification": {
             "risk_label": result["risk_label"],
             "risk_score": result["risk_score"],
-            "gpa_grade": result.get("gpa_grade"),
             "summary": result["summary"],
             "remarks": result["remarks"],
             "recommendations": result["recommendations"],
@@ -117,8 +116,8 @@ async def classify(
 
 @router.get("/history/{student_id}", summary="Get classification history for a student")
 def classification_history(
-    student_id: str,
     limit: int = 10,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -145,7 +144,6 @@ def classification_history(
             "risk_label": h.risk_label,
             "risk_score": h.risk_score,
             "gpa_at_time": h.gpa_at_time,
-            "gpa_grade": h.gpa_grade,
             "summary": h.summary,
             "remarks": h.remarks,
             "recommendations": h.recommendations,

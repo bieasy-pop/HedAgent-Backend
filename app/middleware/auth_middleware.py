@@ -1,5 +1,8 @@
 from fastapi import Depends, HTTPException, Header, status
+from sqlalchemy.orm import Session
 from app.services.firebase import verify_firebase_token
+from app.database import get_db
+from app.models.student import Student
 
 
 async def get_current_user(authorization: str = Header(...)) -> dict:
@@ -53,3 +56,34 @@ def require_role(*roles: str):
             )
         return current_user
     return _check
+
+
+def resolve_student_id(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> str:
+    """
+    Path-param dependency for `{student_id}` routes. Pass the literal
+    "me" instead of an actual Student.id and it resolves to the
+    authenticated user's own student record — so the frontend never
+    needs to look up/store a student's Student.id (a separate id from
+    their Firebase uid) just to call these endpoints.
+
+    Any other value is passed through unchanged (educators/admins keep
+    targeting students by their real Student.id).
+    """
+    if student_id != "me":
+        return student_id
+
+    student = db.query(Student).filter(Student.user_id == current_user["uid"]).first()
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "success": False,
+                "message": "No student profile found for this account.",
+                "code": "STUDENT_NOT_FOUND",
+            },
+        )
+    return student.id

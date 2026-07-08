@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.student import Student
 from app.models.user import User
 from app.schemas.student import StudentUpdate, StudentResponse
-from app.middleware.auth_middleware import get_current_user, require_role
+from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
 from app.services.openai_service import generate_student_insight
 from app.services.cloudinary_service import upload_file
 
@@ -23,11 +23,12 @@ def list_students(
 
 @router.get("/{student_id}", response_model=StudentResponse)
 def get_student(
-    student_id: str,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Students can fetch their own profile; educators/admins can fetch any."""
+    """Students can fetch their own profile (pass "me" as student_id);
+    educators/admins can fetch any by real Student.id."""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -84,15 +85,20 @@ async def update_student(
 
 @router.post("/{student_id}/avatar")
 def upload_avatar(
-    student_id: str,
+    student_id: str = Depends(resolve_student_id),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload or replace a student's avatar via Cloudinary."""
+    """Upload or replace a student's avatar via Cloudinary.
+    Students can upload their own (pass "me" as student_id);
+    educators/admins can upload for any student by real Student.id."""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    if current_user["role"] == "student" and student.user_id != current_user["uid"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     result = upload_file(
         file.file.read(),

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.student import Student
-from app.middleware.auth_middleware import get_current_user, require_role
+from app.middleware.auth_middleware import get_current_user, require_role, resolve_student_id
 from app.services.openai_service import generate_student_insight, educator_chat
 
 router = APIRouter()
@@ -22,13 +22,14 @@ class ChatRequest(BaseModel):
 
 @router.get("/insight/{student_id}")
 async def get_student_insight(
-    student_id: str,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Returns a freshly generated AI insight for a student.
-    Students can request their own insight; educators can request any.
+    Students can request their own insight (pass "me" as student_id);
+    educators can request any by real Student.id.
     """
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
