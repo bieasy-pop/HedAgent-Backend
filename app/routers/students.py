@@ -42,15 +42,20 @@ def get_student(
 
 @router.patch("/{student_id}", response_model=StudentResponse)
 async def update_student(
-    student_id: str,
     payload: StudentUpdate,
+    student_id: str = Depends(resolve_student_id),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_role("educator", "admin")),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Update student academic data and regenerate AI insight."""
+    """Update student data and regenerate AI insight.
+    Students can edit their own record (pass "me" as student_id);
+    educators/admins can edit any student by real Student.id."""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    if current_user["role"] == "student" and student.user_id != current_user["uid"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(student, field, value)
