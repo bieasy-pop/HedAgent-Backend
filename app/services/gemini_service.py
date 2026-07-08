@@ -5,7 +5,7 @@ from app.config import settings
 
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
-    f"gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+    f"gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
 )
 
 SYSTEM_PROMPT = """You are an academic intervention advisor for a school management system.
@@ -116,7 +116,7 @@ Be empathetic, practical and specific. Avoid generic advice."""
             "remarks": result.get("remarks", ""),
             "educator_alert": result.get("educator_alert"),
             "recommendations": result.get("recommendations", []),
-            "model_used": "gemini-1.5-flash",
+            "model_used": "gemini-2.5-flash",
             "triggered_by": triggered_by,
         }
 
